@@ -1,0 +1,33 @@
+# docker-compose.yml - ฐานข้อมูลสำหรับ EDL-Gen Monitoring Workshop
+# รัน MariaDB 11.x และ PostgreSQL 16 พร้อมกัน (Laravel สลับ Driver ได้)
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: edlgen_mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: secret        # รหัส root (ใช้เฉพาะในห้องอบรม)
+      MARIADB_DATABASE: edlgen             # สร้างฐานข้อมูลให้อัตโนมัติ
+      MARIADB_USER: edlgen_user            # ผู้ใช้สำหรับ Laravel
+      MARIADB_PASSWORD: edlgen_pass
+    ports:
+      - "3306:3306"                        # เครื่องเรา:คอนเทนเนอร์
+    volumes:
+      - mariadb_data:/var/lib/mysql        # เก็บข้อมูลถาวร ปิดเครื่องแล้วข้อมูลไม่หาย
+
+  postgres:
+    image: postgres:16
+    container_name: edlgen_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: edlgen
+      POSTGRES_USER: edlgen_user
+      POSTGRES_PASSWORD: edlgen_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  mariadb_data:
+  postgres_data:
