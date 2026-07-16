@@ -1,20 +1,21 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../logic/power_providers.dart';
+import '../../data/models/power_reading.dart';
 
 /// การ์ด Real-time บน gradient header: MW ใหญ่ + ป้าย LIVE + ชิป Hz/kV/น้ำ
-/// ตัวเลขขยับทุก 3 วินาทีจาก StreamProvider (Day 5 Feature 2)
-class LivePowerCard extends ConsumerWidget {
-  const LivePowerCard({super.key});
+/// เป็น StatelessWidget รับข้อมูลจาก DashboardPage
+/// (ค่ามาจากตัวจำลองในแอป - Timer สุ่มค่าทุก 3 วินาที)
+/// - reading == null → กำลังรอค่าแรก
+class LivePowerCard extends StatelessWidget {
+  const LivePowerCard({super.key, this.reading});
+
+  final PowerReading? reading;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final live = ref.watch(latestPowerReadingProvider);
-
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -22,106 +23,101 @@ class LivePowerCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
-      child: live.when(
-        loading: () => Row(
-          children: [
-            const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white),
+      child: _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    // สถานะกำลังรอข้อมูลค่าแรก
+    final r = reading;
+    if (r == null) {
+      return Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child:
+                CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              context.tr('dash_waiting'),
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
-            const SizedBox(width: 12),
+          ),
+        ],
+      );
+    }
+
+    // สถานะมีข้อมูล
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
             Expanded(
               child: Text(
-                context.tr('dash_waiting'),
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                context.tr('dash_total'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+            // ป้าย LIVE จุดแดงกะพริบตามข้อมูลใหม่
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.signalRed,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(radius: 3, backgroundColor: Colors.white),
+                  SizedBox(width: 5),
+                  Text('LIVE',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700)),
+                ],
               ),
             ),
           ],
         ),
-        error: (e, _) => Row(
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Icon(Icons.wifi_off, color: Colors.white70, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                context.tr('dash_ws_error'),
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
-              ),
+            Text(
+              r.powerMw.toStringAsFixed(1),
+              style: AppTheme.numberStyle(fontSize: 40, color: Colors.white),
+            ),
+            const SizedBox(width: 6),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text('MW',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
             ),
           ],
         ),
-        data: (r) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 10),
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    context.tr('dash_total'),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ),
-                // ป้าย LIVE จุดแดงกะพริบตามข้อมูลใหม่
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.signalRed,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircleAvatar(radius: 3, backgroundColor: Colors.white),
-                      SizedBox(width: 5),
-                      Text('LIVE',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  r.powerMw.toStringAsFixed(1),
-                  style: AppTheme.numberStyle(fontSize: 40, color: Colors.white),
-                ),
-                const SizedBox(width: 6),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text('MW',
-                      style: TextStyle(color: Colors.white70, fontSize: 14)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _MetricChip(
-                    label: context.tr('dash_freq'),
-                    value: '${r.frequency.toStringAsFixed(2)} Hz'),
-                const SizedBox(width: 8),
-                _MetricChip(
-                    label: context.tr('dash_volt'),
-                    value: '${r.voltageKv.toStringAsFixed(1)} kV'),
-                const SizedBox(width: 8),
-                _MetricChip(label: context.tr('dash_water'), value: '198.4 m'),
-              ],
-            ),
+            _MetricChip(
+                label: context.tr('dash_freq'),
+                value: '${r.frequency.toStringAsFixed(2)} Hz'),
+            const SizedBox(width: 8),
+            _MetricChip(
+                label: context.tr('dash_volt'),
+                value: '${r.voltageKv.toStringAsFixed(1)} kV'),
+            const SizedBox(width: 8),
+            _MetricChip(label: context.tr('dash_water'), value: '198.4 m'),
           ],
         ),
-      ),
+      ],
     );
   }
 }

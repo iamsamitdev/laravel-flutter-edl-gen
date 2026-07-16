@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -20,7 +21,7 @@ class StatCard extends StatelessWidget {
   final String title;
   final String value;
   final String unit;
-  final IconData icon;
+  final List<List<dynamic>> icon; // ไอคอนจาก HugeIcons.strokeRoundedXxx
   final Color? color;
   final double? trend;
   final VoidCallback? onTap;
@@ -49,7 +50,7 @@ class StatCard extends StatelessWidget {
                       color: accent.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 20, color: accent),
+                    child: HugeIcon(icon: icon, size: 20, color: accent),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -61,7 +62,8 @@ class StatCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              // ไม่ใส่ SizedBox คั่น: Column ใช้ spaceBetween จัดระยะเองแล้ว
+              // ถ้าใส่ความสูงตายตัวเพิ่ม จะ overflow เมื่อการ์ดถูกจำกัดความสูง
               // แถวล่าง: ตัวเลขใหญ่ (ฟอนต์ Inter เสมอ) + หน่วย + แนวโน้ม
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -106,7 +108,12 @@ class _TrendChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(up ? Icons.trending_up : Icons.trending_down, size: 14, color: color),
+        HugeIcon(
+            icon: up
+                ? HugeIcons.strokeRoundedTradeUp
+                : HugeIcons.strokeRoundedTradeDown,
+            size: 14,
+            color: color),
         const SizedBox(width: 2),
         Text(
           '${up ? '+' : ''}${trend.toStringAsFixed(1)}%',

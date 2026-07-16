@@ -1,20 +1,19 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../logic/power_providers.dart';
+import '../../data/models/power_reading.dart';
 
 /// กราฟเส้นกำลังผลิต 30 ค่าล่าสุด - เลื่อนขวาเรื่อย ๆ เมื่อมีค่าใหม่ (fl_chart)
-class PowerChart extends ConsumerWidget {
-  const PowerChart({super.key, this.waitingText = ''});
+/// เป็น StatelessWidget รับ history จาก DashboardPage
+class PowerChart extends StatelessWidget {
+  const PowerChart({super.key, required this.history, this.waitingText = ''});
 
+  final List<PowerReading> history;
   final String waitingText;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(powerHistoryProvider);
-
+  Widget build(BuildContext context) {
     if (history.isEmpty) {
       return SizedBox(
         height: 180,

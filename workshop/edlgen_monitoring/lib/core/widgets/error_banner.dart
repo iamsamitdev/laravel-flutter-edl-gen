@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 
@@ -27,7 +28,9 @@ class ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.critical),
+          const HugeIcon(
+              icon: HugeIcons.strokeRoundedAlertCircle,
+              color: AppColors.critical),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -37,7 +40,8 @@ class ErrorBanner extends StatelessWidget {
           ),
           TextButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const HugeIcon(
+                icon: HugeIcons.strokeRoundedRefresh, size: 18),
             label: Text(retryLabel),
           ),
         ],

@@ -1,57 +1,91 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:hugeicons/hugeicons.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/alert_tile.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/gradient_header.dart';
-import '../data/incident_repository.dart';
 import '../data/models/incident.dart';
 
-part 'incident_detail_page.g.dart';
-
-@riverpod
-Future<Incident> incidentDetail(Ref ref, int incidentId) async {
-  return ref.watch(incidentRepositoryProvider).fetchIncident(incidentId);
-}
-
 /// Incident detail: badge สถานะ + รูป + ตารางข้อมูล + timeline 4 ขั้น
-class IncidentDetailPage extends ConsumerWidget {
+/// โหลดข้อมูลใน initState แล้ว setState
+class IncidentDetailPage extends StatefulWidget {
   const IncidentDetailPage({super.key, required this.incidentId});
 
   final int incidentId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final incident = ref.watch(incidentDetailProvider(incidentId));
+  State<IncidentDetailPage> createState() => _IncidentDetailPageState();
+}
 
-    return Scaffold(
-      body: incident.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => SafeArea(
-          child: Column(
-            children: [
-              AppBar(leading: BackButton(onPressed: () => context.pop())),
-              ErrorBanner(
-                message: '$e',
-                retryLabel: context.tr('retry'),
-                onRetry: () =>
-                    ref.invalidate(incidentDetailProvider(incidentId)),
+class _IncidentDetailPageState extends State<IncidentDetailPage> {
+  Incident? _incident; // null = กำลังโหลด
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _incident = null;
+      _error = null;
+    });
+    try {
+      final incident =
+          await incidentRepository.fetchIncident(widget.incidentId);
+      if (!mounted) return;
+      setState(() => _incident = incident);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(body: _buildBody(context));
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_error != null) {
+      return SafeArea(
+        child: Column(
+          children: [
+            AppBar(
+              leading: IconButton(
+                onPressed: () => context.pop(),
+                icon:
+                    const HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft02),
               ),
-            ],
-          ),
+            ),
+            ErrorBanner(
+              message: _error!,
+              retryLabel: context.tr('retry'),
+              onRetry: _load,
+            ),
+          ],
         ),
-        data: (inc) {
-          final severity = AlertSeverity.fromString(inc.severity);
-          final statusIndex = switch (inc.status) {
-            'open' => 0,
-            'investigating' => 2,
-            _ => 3,
-          };
-          return ListView(
+      );
+    }
+
+    final inc = _incident;
+    if (inc == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final severity = AlertSeverity.fromString(inc.severity);
+    final statusIndex = switch (inc.status) {
+      'open' => 0,
+      'investigating' => 2,
+      _ => 3,
+    };
+    return ListView(
             padding: EdgeInsets.zero,
             children: [
               GradientHeader(
@@ -115,7 +149,11 @@ class IncidentDetailPage extends ConsumerWidget {
                           errorBuilder: (_, _, _) => Container(
                             height: 180,
                             color: AppColors.border,
-                            child: const Icon(Icons.broken_image_outlined),
+                            child: const Center(
+                              child: HugeIcon(
+                                  icon:
+                                      HugeIcons.strokeRoundedImageNotFound01),
+                            ),
                           ),
                         ),
                       ),
@@ -175,10 +213,7 @@ class IncidentDetailPage extends ConsumerWidget {
                   ],
                 ),
               ),
-            ],
-          );
-        },
-      ),
+      ],
     );
   }
 }
@@ -227,8 +262,10 @@ class _TimelineStep extends StatelessWidget {
         children: [
           Column(
             children: [
-              Icon(
-                done ? Icons.check_circle : Icons.radio_button_unchecked,
+              HugeIcon(
+                icon: done
+                    ? HugeIcons.strokeRoundedCheckmarkCircle02
+                    : HugeIcons.strokeRoundedCircle,
                 size: 20,
                 color: color,
               ),

@@ -1,13 +1,15 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
-import '../logic/auth_cubit.dart';
-import '../logic/auth_state.dart';
 
-/// Login (Day 5 Feature 1): โลโก้ + segmented สลับภาษา + ฟอร์ม + BlocConsumer
+/// Login: โลโก้ + segmented สลับภาษา + ฟอร์ม (setState ธรรมดา)
+/// - _loading เป็น state ของหน้านี้: true ระหว่างรอ API
+/// - login สำเร็จ → AuthController แจ้ง GoRouter ให้ redirect ไป Dashboard เอง
+/// - login ล้มเหลว → SnackBar สีแดง
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -20,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailCtrl = TextEditingController(text: 'engineer@edlgen.la');
   final _passCtrl = TextEditingController(text: 'password123');
   bool _obscure = true;
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -28,32 +31,33 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.read<AuthCubit>().login(
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text,
-        );
+
+    setState(() => _loading = true);
+    final success = await authController.login(
+      email: _emailCtrl.text.trim(),
+      password: _passCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('เข้าสู่ระบบไม่สำเร็จ: ตรวจสอบอีเมลหรือรหัสผ่าน'),
+          backgroundColor: AppColors.critical,
+        ),
+      );
+    }
+    // สำเร็จ: ไม่ต้องนำทางเอง GoRouter redirect ให้อัตโนมัติ
   }
 
   @override
   Widget build(BuildContext context) {
+    final loading = _loading;
     return Scaffold(
-      body: BlocConsumer<AuthCubit, AuthState>(
-        listener: (context, state) {
-          // Side effect เท่านั้น - การนำทางเป็นหน้าที่ของ GoRouter redirect
-          if (state.status == AuthStatus.failure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.errorMessage ?? context.tr('login_error')),
-                backgroundColor: AppColors.critical,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          final loading = state.status == AuthStatus.authenticating;
-          return Center(
+      body: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
@@ -90,7 +94,14 @@ class _LoginPageState extends State<LoginPage> {
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: context.tr('f_email'),
-                          prefixIcon: const Icon(Icons.mail_outline),
+                          // ครอบ Center กันไอคอนถูกยืดเต็มกรอบ 48px
+                          prefixIcon: const Center(
+                            widthFactor: 1,
+                            heightFactor: 1,
+                            child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedMail01,
+                                size: 22),
+                          ),
                         ),
                         validator: (v) => (v == null || !v.contains('@'))
                             ? context.tr('f_email')
@@ -102,11 +113,19 @@ class _LoginPageState extends State<LoginPage> {
                         obscureText: _obscure,
                         decoration: InputDecoration(
                           labelText: context.tr('f_password'),
-                          prefixIcon: const Icon(Icons.lock_outline),
+                          prefixIcon: const Center(
+                            widthFactor: 1,
+                            heightFactor: 1,
+                            child: HugeIcon(
+                                icon: HugeIcons.strokeRoundedSquareLock02,
+                                size: 22),
+                          ),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscure
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined),
+                            icon: HugeIcon(
+                                icon: _obscure
+                                    ? HugeIcons.strokeRoundedView
+                                    : HugeIcons.strokeRoundedViewOffSlash,
+                                size: 22),
                             onPressed: () =>
                                 setState(() => _obscure = !_obscure),
                           ),
@@ -146,8 +165,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ),
-          );
-        },
       ),
     );
   }

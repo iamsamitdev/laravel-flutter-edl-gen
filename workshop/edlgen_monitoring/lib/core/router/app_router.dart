@@ -1,10 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/auth/logic/auth_cubit.dart';
-import '../../features/auth/logic/auth_state.dart';
+import '../../features/auth/logic/auth_controller.dart';
 import '../../features/auth/presentation/forgot_password_page.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/splash_page.dart';
@@ -20,36 +17,23 @@ import '../../features/notifications/presentation/notifications_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 import '../../features/reports/presentation/date_range_page.dart';
 import '../../features/reports/presentation/reports_page.dart';
+import '../app_services.dart';
 import 'app_shell.dart';
-
-/// แปลง Stream ของ Cubit เป็น Listenable ให้ GoRouter re-evaluate redirect
-/// ทุกครั้งที่ AuthState เปลี่ยน (Day 4/5 Route Guard)
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    _subscription = stream.listen((_) => notifyListeners());
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
-}
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter buildRouter(AuthCubit authCubit) {
+GoRouter buildRouter() {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/dashboard',
     debugLogDiagnostics: true,
-    refreshListenable: GoRouterRefreshStream(authCubit.stream),
+    // AuthController เป็น ChangeNotifier → GoRouter re-evaluate redirect
+    // ทุกครั้งที่สถานะ login เปลี่ยน (Route Guard)
+    refreshListenable: authController,
 
     // 🔐 Route Guard: คุมทุกการนำทางรวมถึง Deep Link
     redirect: (context, state) {
-      final status = authCubit.state.status;
+      final status = authController.status;
       final location = state.matchedLocation;
       const publicRoutes = ['/login', '/forgot-password'];
 
@@ -111,7 +95,9 @@ GoRouter buildRouter(AuthCubit authCubit) {
         builder: (context, state) => const GpsMapPage(),
       ),
       GoRoute(
-        path: '/incidents/:id',
+        // ใช้ /incidents/detail/:id (ไม่ใช่ /incidents/:id) เพราะ pattern :id
+        // จะดักจับ /incidents/new ของแท็บแจ้งเหตุ แล้ว int.parse("new") จะพัง
+        path: '/incidents/detail/:id',
         name: 'incident-detail',
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => IncidentDetailPage(

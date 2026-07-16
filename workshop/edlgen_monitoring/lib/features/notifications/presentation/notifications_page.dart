@@ -1,25 +1,51 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/widgets/alert_tile.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/gradient_header.dart';
 import '../../../core/widgets/skeletons.dart';
 import '../../../core/widgets/status_badge.dart';
-import '../../incidents/data/incident_repository.dart';
 import '../../incidents/data/models/incident.dart';
 
 /// Notifications: จัดกลุ่มวันนี้/เมื่อวาน จากรายการเหตุขัดข้องจริงใน API
-/// แถว critical แตะแล้วไปหน้า incident detail (ตามดีไซน์หน้า 14)
-class NotificationsPage extends ConsumerWidget {
+/// โหลดข้อมูลใน initState แล้ว setState
+class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final incidents = ref.watch(_incidentListProvider);
+  State<NotificationsPage> createState() => _NotificationsPageState();
+}
 
+class _NotificationsPageState extends State<NotificationsPage> {
+  List<Incident>? _incidents; // null = กำลังโหลด
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _incidents = null;
+      _error = null;
+    });
+    try {
+      final incidents = await incidentRepository.fetchIncidents();
+      if (!mounted) return;
+      setState(() => _incidents = incidents);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
@@ -27,56 +53,59 @@ class NotificationsPage extends ConsumerWidget {
             title: context.tr('ntf_title'),
             onBack: () => context.pop(),
           ),
-          Expanded(
-            child: incidents.when(
-              loading: () => const Column(
-                children: [
-                  SizedBox(height: 8),
-                  ListTileSkeleton(),
-                  ListTileSkeleton(),
-                  ListTileSkeleton(),
-                ],
-              ),
-              error: (e, _) => ErrorBanner(
-                message: '$e',
-                retryLabel: context.tr('retry'),
-                onRetry: () => ref.invalidate(_incidentListProvider),
-              ),
-              data: (list) {
-                final today = <Incident>[];
-                final earlier = <Incident>[];
-                final now = DateTime.now();
-                for (final incident in list) {
-                  final at = incident.occurredAt?.toLocal();
-                  if (at != null &&
-                      at.year == now.year &&
-                      at.month == now.month &&
-                      at.day == now.day) {
-                    today.add(incident);
-                  } else {
-                    earlier.add(incident);
-                  }
-                }
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  children: [
-                    if (today.isNotEmpty) ...[
-                      _GroupHeader(context.tr('ntf_today')),
-                      for (final incident in today)
-                        _tile(context, incident),
-                    ],
-                    if (earlier.isNotEmpty) ...[
-                      _GroupHeader(context.tr('ntf_yesterday')),
-                      for (final incident in earlier)
-                        _tile(context, incident),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ),
+          Expanded(child: _buildList(context)),
         ],
       ),
+    );
+  }
+
+  Widget _buildList(BuildContext context) {
+    if (_error != null) {
+      return ErrorBanner(
+        message: _error!,
+        retryLabel: context.tr('retry'),
+        onRetry: _load,
+      );
+    }
+
+    final list = _incidents;
+    if (list == null) {
+      return const Column(
+        children: [
+          SizedBox(height: 8),
+          ListTileSkeleton(),
+          ListTileSkeleton(),
+          ListTileSkeleton(),
+        ],
+      );
+    }
+
+    final today = <Incident>[];
+    final earlier = <Incident>[];
+    final now = DateTime.now();
+    for (final incident in list) {
+      final at = incident.occurredAt?.toLocal();
+      if (at != null &&
+          at.year == now.year &&
+          at.month == now.month &&
+          at.day == now.day) {
+        today.add(incident);
+      } else {
+        earlier.add(incident);
+      }
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        if (today.isNotEmpty) ...[
+          _GroupHeader(context.tr('ntf_today')),
+          for (final incident in today) _tile(context, incident),
+        ],
+        if (earlier.isNotEmpty) ...[
+          _GroupHeader(context.tr('ntf_yesterday')),
+          for (final incident in earlier) _tile(context, incident),
+        ],
+      ],
     );
   }
 
@@ -95,15 +124,11 @@ class NotificationsPage extends ConsumerWidget {
         severityLabel: context.tr(severity.labelKey),
         plantStatus:
             incident.status == 'resolved' ? PlantStatus.online : null,
-        onTap: () => context.push('/incidents/${incident.id}'),
+        onTap: () => context.push('/incidents/detail/${incident.id}'),
       ),
     );
   }
 }
-
-final _incidentListProvider = FutureProvider<List<Incident>>((ref) {
-  return ref.watch(incidentRepositoryProvider).fetchIncidents();
-});
 
 class _GroupHeader extends StatelessWidget {
   const _GroupHeader(this.text);

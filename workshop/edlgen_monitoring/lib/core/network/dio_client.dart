@@ -1,16 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 
-/// สร้าง Dio ตัวเดียวใช้ทั้งแอป - main.dart จะ override dioProvider ด้วยตัวนี้
+/// สร้าง Dio ตัวเดียวใช้ทั้งแอป (ดูตัวแปร global `dio` ใน app_services.dart)
 Dio buildDioClient() {
   final dio = Dio(
     BaseOptions(
       baseUrl: AppConfig.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      // Render แผนฟรีจะ "หลับ" เมื่อไม่มีคนใช้ ตื่นครั้งแรกใช้เวลาถึง ~1 นาที
+      // จึงตั้ง timeout ยาวกว่าปกติ
+      connectTimeout: const Duration(seconds: 70),
+      receiveTimeout: const Duration(seconds: 70),
       headers: {'Accept': 'application/json'},
     ),
   );
@@ -21,9 +22,3 @@ Dio buildDioClient() {
 
   return dio;
 }
-
-/// Provider ของ Dio - ค่าจริงถูก override ใน main.dart
-/// (สร้างที่นั่นเพราะต้องผูก AuthInterceptor ที่อ้างถึง AuthCubit)
-final dioProvider = Provider<Dio>((ref) {
-  throw UnimplementedError('dioProvider ต้องถูก override ใน ProviderScope');
-});

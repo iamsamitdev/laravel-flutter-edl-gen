@@ -1,7 +1,5 @@
-import 'package:equatable/equatable.dart';
-
 /// ผู้ใช้ที่ล็อกอินอยู่ (จาก UserResource ฝั่ง Laravel)
-class AuthUser extends Equatable {
+class AuthUser {
   const AuthUser({
     required this.id,
     required this.name,
@@ -20,9 +18,6 @@ class AuthUser extends Equatable {
         email: json['email'] as String,
         role: (json['role'] as String?) ?? 'operator',
       );
-
-  @override
-  List<Object?> get props => [id, name, email, role];
 }
 
 /// ผลลัพธ์การ Login: token + วันหมดอายุ + ข้อมูลผู้ใช้

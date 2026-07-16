@@ -1,12 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/dio_client.dart';
 import 'models/meter_reading.dart';
-
-part 'meter_repository.g.dart';
 
 class MeterRepository {
   MeterRepository({required this.dio});
@@ -45,9 +41,4 @@ class MeterRepository {
       throw ApiException.fromDioException(e);
     }
   }
-}
-
-@Riverpod(keepAlive: true)
-MeterRepository meterRepository(Ref ref) {
-  return MeterRepository(dio: ref.watch(dioProvider));
 }

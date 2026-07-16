@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 
@@ -71,8 +72,10 @@ class GradientHeader extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(11),
                         ),
-                        child: const Icon(Icons.chevron_left,
-                            color: Colors.white, size: 24),
+                        child: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedArrowLeft01,
+                            color: Colors.white,
+                            size: 24),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -114,8 +117,10 @@ class GradientHeader extends StatelessWidget {
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
-                            const Icon(Icons.notifications_none,
-                                color: Colors.white, size: 22),
+                            const HugeIcon(
+                                icon: HugeIcons.strokeRoundedNotification03,
+                                color: Colors.white,
+                                size: 22),
                             Positioned(
                               top: 9,
                               right: 10,

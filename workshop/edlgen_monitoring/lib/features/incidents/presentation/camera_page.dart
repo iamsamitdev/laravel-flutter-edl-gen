@@ -1,31 +1,29 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../logic/incident_form_providers.dart';
 
 /// Camera: วิวไฟน์เดอร์ + กรอบมุม + ปุ่มชัตเตอร์/คลังรูป
-/// ปุ่มชัตเตอร์เรียกกล้องจริงผ่าน image_picker (Day 5 Feature 4)
-class CameraPage extends ConsumerWidget {
+/// ถ่ายรูปด้วย image_picker แล้ว "ส่ง path กลับ" ให้หน้าฟอร์มผ่าน context.pop(path)
+class CameraPage extends StatelessWidget {
   const CameraPage({super.key});
 
-  Future<void> _capture(BuildContext context, WidgetRef ref,
-      {bool gallery = false}) async {
-    final notifier = ref.read(incidentPhotoProvider.notifier);
-    if (gallery) {
-      await notifier.pickFromGallery();
-    } else {
-      await notifier.takePhoto();
-    }
-    if (context.mounted && ref.read(incidentPhotoProvider) != null) {
-      context.pop(); // ได้รูปแล้วกลับไปหน้าฟอร์ม
+  Future<void> _capture(BuildContext context, {bool gallery = false}) async {
+    final picked = await ImagePicker().pickImage(
+      source: gallery ? ImageSource.gallery : ImageSource.camera,
+      maxWidth: 1600,
+      imageQuality: 80, // ย่อรูปก่อนอัปโหลด กันไฟล์เกิน 5 MB
+    );
+    if (context.mounted && picked != null) {
+      context.pop(picked.path); // ได้รูปแล้วส่ง path กลับไปหน้าฟอร์ม
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -37,7 +35,9 @@ class CameraPage extends ConsumerWidget {
                 children: [
                   IconButton(
                     onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedCancel01,
+                        color: Colors.white),
                   ),
                   Expanded(
                     child: Text(
@@ -69,8 +69,10 @@ class CameraPage extends ConsumerWidget {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.photo_camera_outlined,
-                                  size: 44, color: Colors.white38),
+                              const HugeIcon(
+                                  icon: HugeIcons.strokeRoundedCamera01,
+                                  size: 44,
+                                  color: Colors.white38),
                               const SizedBox(height: 10),
                               Text(
                                 context.tr('cam_hint'),
@@ -131,9 +133,11 @@ class CameraPage extends ConsumerWidget {
                     children: [
                       IconButton(
                         onPressed: () =>
-                            _capture(context, ref, gallery: true),
-                        icon: const Icon(Icons.photo_library_outlined,
-                            color: Colors.white, size: 30),
+                            _capture(context, gallery: true),
+                        icon: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedAlbum02,
+                            color: Colors.white,
+                            size: 30),
                       ),
                       Text(context.tr('cam_gallery'),
                           style: const TextStyle(
@@ -141,7 +145,7 @@ class CameraPage extends ConsumerWidget {
                     ],
                   ),
                   GestureDetector(
-                    onTap: () => _capture(context, ref),
+                    onTap: () => _capture(context),
                     child: Container(
                       width: 72,
                       height: 72,

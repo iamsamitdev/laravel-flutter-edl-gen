@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 import 'status_badge.dart';
 
 /// ระดับความรุนแรงของเหตุขัดข้อง (ตรงกับ enum severity ฝั่ง Laravel)
+/// หมายเหตุ: ไอคอน HugeIcons มีชนิดเป็น `List<List<dynamic>>` (ข้อมูล SVG)
+/// ไม่ใช่ IconData แบบ Material Icons และต้องแสดงผ่าน widget HugeIcon
 enum AlertSeverity {
-  low('sev_low', AppColors.success, Icons.info_outline),
-  medium('sev_med', AppColors.warning, Icons.warning_amber),
-  high('sev_high', Color(0xFFEA7317), Icons.error_outline),
-  critical('sev_crit', AppColors.critical, Icons.error);
+  low('sev_low', AppColors.success, HugeIcons.strokeRoundedInformationCircle),
+  medium('sev_med', AppColors.warning, HugeIcons.strokeRoundedAlert02),
+  high('sev_high', Color(0xFFEA7317), HugeIcons.strokeRoundedAlertCircle),
+  critical('sev_crit', AppColors.critical, HugeIcons.strokeRoundedAlertDiamond);
 
   const AlertSeverity(this.labelKey, this.color, this.icon);
 
   final String labelKey;
   final Color color;
-  final IconData icon;
+  final List<List<dynamic>> icon;
 
   static AlertSeverity fromString(String value) => switch (value) {
         'low' => AlertSeverity.low,
@@ -57,7 +60,7 @@ class AlertTile extends StatelessWidget {
           color: severity.color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(severity.icon, color: severity.color),
+        child: HugeIcon(icon: severity.icon, color: severity.color),
       ),
       title: Text(
         title,

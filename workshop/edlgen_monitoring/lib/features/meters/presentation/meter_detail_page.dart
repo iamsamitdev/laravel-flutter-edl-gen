@@ -1,12 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/gradient_header.dart';
-import '../../auth/logic/auth_cubit.dart';
 
 /// Meter detail: ค่าที่อ่านใหญ่ + สถานะ + ค่าก่อนหน้า/ผลต่าง/ผู้บันทึก/เวลา
 /// (รับค่าผ่าน route extra จากหน้า MeterPage - ข้อมูลจำลองบางส่วน)
@@ -26,7 +25,7 @@ class MeterDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userName = context.watch<AuthCubit>().state.user?.name ?? '-';
+    final userName = authController.user?.name ?? '-';
     final time = recordedFor ?? DateTime.now();
     final previous = readingKwh - 118.2; // ค่าก่อนหน้า (จำลองสำหรับดีไซน์)
 

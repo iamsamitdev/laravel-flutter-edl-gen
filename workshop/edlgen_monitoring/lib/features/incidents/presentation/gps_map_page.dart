@@ -1,21 +1,45 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../logic/incident_form_providers.dart';
+import '../data/location_service.dart';
 
 /// GPS map: แผนที่จำลอง (grid) + หมุด + วงความแม่นยำ + bottom sheet พิกัดจริง
-/// พิกัดมาจาก geolocator ผ่าน currentPositionProvider (Day 5 Feature 4)
-class GpsMapPage extends ConsumerWidget {
+/// ขอพิกัดเองใน initState ผ่าน getCurrentPosition() แล้ว setState
+class GpsMapPage extends StatefulWidget {
   const GpsMapPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final position = ref.watch(currentPositionProvider);
+  State<GpsMapPage> createState() => _GpsMapPageState();
+}
 
+class _GpsMapPageState extends State<GpsMapPage> {
+  Position? _position; // null = กำลังหาพิกัด
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final position = await getCurrentPosition();
+      if (!mounted) return;
+      setState(() => _position = position);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
@@ -41,8 +65,12 @@ class GpsMapPage extends ConsumerWidget {
                     border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.4)),
                   ),
-                  child: const Icon(Icons.location_on,
-                      color: AppColors.signalRed, size: 40),
+                  child: const Center(
+                    child: HugeIcon(
+                        icon: HugeIcons.strokeRoundedLocation01,
+                        color: AppColors.signalRed,
+                        size: 40),
+                  ),
                 ),
               ],
             ),
@@ -55,7 +83,8 @@ class GpsMapPage extends ConsumerWidget {
                 backgroundColor: Theme.of(context).cardColor,
                 child: IconButton(
                   onPressed: () => context.pop(),
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const HugeIcon(
+                      icon: HugeIcons.strokeRoundedArrowLeft02),
                 ),
               ),
             ),
@@ -79,24 +108,25 @@ class GpsMapPage extends ConsumerWidget {
                       style: const TextStyle(
                           fontWeight: FontWeight.w700, fontSize: 15)),
                   const SizedBox(height: 8),
-                  position.when(
-                    loading: () => Text(context.tr('inc_gps_wait')),
-                    error: (e, _) => Text('$e',
-                        style: const TextStyle(color: AppColors.critical)),
-                    data: (p) => Text(
-                      '${p.latitude.toStringAsFixed(6)}, ${p.longitude.toStringAsFixed(6)}'
-                      '  ·  ±${p.accuracy.toStringAsFixed(0)} m',
+                  if (_error != null)
+                    Text(_error!,
+                        style: const TextStyle(color: AppColors.critical))
+                  else if (_position == null)
+                    Text(context.tr('inc_gps_wait'))
+                  else
+                    Text(
+                      '${_position!.latitude.toStringAsFixed(6)}, ${_position!.longitude.toStringAsFixed(6)}'
+                      '  ·  ±${_position!.accuracy.toStringAsFixed(0)} m',
                       style: AppTheme.numberStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: Theme.of(context).textTheme.bodyMedium?.color,
                       ),
                     ),
-                  ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: position.hasValue ? () => context.pop() : null,
-                    icon: const Icon(Icons.check),
+                    onPressed: _position != null ? () => context.pop() : null,
+                    icon: const HugeIcon(icon: HugeIcons.strokeRoundedTick02),
                     label: Text(context.tr('gps_use')),
                   ),
                 ],

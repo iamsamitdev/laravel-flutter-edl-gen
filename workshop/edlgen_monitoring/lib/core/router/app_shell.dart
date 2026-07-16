@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 
@@ -42,8 +43,7 @@ class AppShell extends StatelessWidget {
             child: Row(
               children: [
                 _NavItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
+                  icon: HugeIcons.strokeRoundedHome01,
                   label: context.tr('nav_home'),
                   selected: navigationShell.currentIndex == 0,
                   activeColor: active,
@@ -51,8 +51,7 @@ class AppShell extends StatelessWidget {
                   onTap: () => _goBranch(0),
                 ),
                 _NavItem(
-                  icon: Icons.description_outlined,
-                  activeIcon: Icons.description,
+                  icon: HugeIcons.strokeRoundedFile01,
                   label: context.tr('nav_reports'),
                   selected: navigationShell.currentIndex == 1,
                   activeColor: active,
@@ -84,8 +83,12 @@ class AppShell extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            child: const Icon(Icons.warning_amber_rounded,
-                                color: Colors.white, size: 24),
+                            child: const Center(
+                              child: HugeIcon(
+                                  icon: HugeIcons.strokeRoundedAlert02,
+                                  color: Colors.white,
+                                  size: 24),
+                            ),
                           ),
                         ),
                         Transform.translate(
@@ -106,8 +109,7 @@ class AppShell extends StatelessWidget {
                   ),
                 ),
                 _NavItem(
-                  icon: Icons.speed_outlined,
-                  activeIcon: Icons.speed,
+                  icon: HugeIcons.strokeRoundedDashboardSpeed01,
                   label: context.tr('nav_meter'),
                   selected: navigationShell.currentIndex == 3,
                   activeColor: active,
@@ -115,8 +117,7 @@ class AppShell extends StatelessWidget {
                   onTap: () => _goBranch(3),
                 ),
                 _NavItem(
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
+                  icon: HugeIcons.strokeRoundedUser,
                   label: context.tr('nav_profile'),
                   selected: navigationShell.currentIndex == 4,
                   activeColor: active,
@@ -135,7 +136,6 @@ class AppShell extends StatelessWidget {
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
-    required this.activeIcon,
     required this.label,
     required this.selected,
     required this.activeColor,
@@ -143,8 +143,9 @@ class _NavItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
-  final IconData activeIcon;
+  // HugeIcons ชุดฟรีมีเฉพาะแบบเส้น (stroke) จึงใช้ไอคอนเดียว
+  // แล้วแยกสถานะ active/inactive ด้วย "สี" แทนการสลับรูป
+  final List<List<dynamic>> icon;
   final String label;
   final bool selected;
   final Color activeColor;
@@ -163,7 +164,12 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? activeIcon : icon, size: 23, color: color),
+              HugeIcon(
+                icon: icon,
+                size: 23,
+                color: color,
+                strokeWidth: selected ? 2.0 : 1.5, // แท็บที่เลือกเส้นหนาขึ้น
+              ),
               const SizedBox(height: 3),
               Text(
                 label,

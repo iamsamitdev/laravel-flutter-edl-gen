@@ -1,19 +1,26 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hugeicons/hugeicons.dart';
 
-import '../../../core/providers/settings_providers.dart';
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_header.dart';
-import '../../auth/logic/auth_cubit.dart';
 
 /// Profile & Settings: การ์ดโปรไฟล์ + เมนูภาษา (คลิกวนภาษา) +
-/// toggle dark mode/แจ้งเตือน + ปุ่มออกจากระบบ (ดีไซน์หน้า 16)
-class ProfilePage extends ConsumerWidget {
+/// toggle dark mode/แจ้งเตือน + ปุ่มออกจากระบบ
+/// - Dark mode: เรียก toggleThemeMode() (app_services.dart)
+/// - เปิด/ปิดแจ้งเตือน: state ในหน้านี้เอง (setState ธรรมดา)
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   static const _locales = [Locale('lo'), Locale('th'), Locale('en')];
+
+  bool _notificationsEnabled = true;
 
   void _cycleLanguage(BuildContext context) {
     final current = context.locale;
@@ -23,10 +30,9 @@ class ProfilePage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = context.watch<AuthCubit>().state.user;
-    final themeMode = ref.watch(themeModeProvider);
-    final notifEnabled = ref.watch(notificationsEnabledProvider);
+  Widget build(BuildContext context) {
+    final user = authController.user;
+    final isDark = themeModeNotifier.value == ThemeMode.dark;
 
     return Scaffold(
       body: ListView(
@@ -88,7 +94,8 @@ class ProfilePage extends ConsumerWidget {
                     children: [
                       // ภาษา - แตะเพื่อวนภาษา ລາວ → ไทย → EN
                       ListTile(
-                        leading: const Icon(Icons.language),
+                        leading: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedGlobe02),
                         title: Text(context.tr('set_lang')),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -100,32 +107,38 @@ class ProfilePage extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const Icon(Icons.chevron_right),
+                            const HugeIcon(
+                                icon: HugeIcons.strokeRoundedArrowRight01),
                           ],
                         ),
                         onTap: () => _cycleLanguage(context),
                       ),
                       const Divider(height: 1),
                       SwitchListTile(
-                        secondary: const Icon(Icons.dark_mode_outlined),
+                        secondary:
+                            const HugeIcon(icon: HugeIcons.strokeRoundedMoon02),
                         title: Text(context.tr('set_dark')),
-                        value: themeMode == ThemeMode.dark,
-                        onChanged: (_) =>
-                            ref.read(themeModeProvider.notifier).toggle(),
+                        value: isDark,
+                        onChanged: (_) async {
+                          await toggleThemeMode();
+                          // MaterialApp เปลี่ยนธีมเอง แต่ setState เพื่อให้
+                          // switch ในหน้านี้สะท้อนค่าใหม่ทันที
+                          setState(() {});
+                        },
                       ),
                       const Divider(height: 1),
                       SwitchListTile(
-                        secondary:
-                            const Icon(Icons.notifications_outlined),
+                        secondary: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedNotification03),
                         title: Text(context.tr('set_notif')),
-                        value: notifEnabled,
-                        onChanged: (value) => ref
-                            .read(notificationsEnabledProvider.notifier)
-                            .set(value),
+                        value: _notificationsEnabled,
+                        onChanged: (value) =>
+                            setState(() => _notificationsEnabled = value),
                       ),
                       const Divider(height: 1),
                       ListTile(
-                        leading: const Icon(Icons.info_outline),
+                        leading: const HugeIcon(
+                            icon: HugeIcons.strokeRoundedInformationCircle),
                         title: Text(context.tr('set_about')),
                         trailing: const Text('v1.0.0'),
                         onTap: () => showAboutDialog(
@@ -140,8 +153,9 @@ class ProfilePage extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Card(
                   child: ListTile(
-                    leading:
-                        const Icon(Icons.logout, color: AppColors.critical),
+                    leading: const HugeIcon(
+                        icon: HugeIcons.strokeRoundedLogout03,
+                        color: AppColors.critical),
                     title: Text(
                       context.tr('prof_logout'),
                       style: const TextStyle(
@@ -149,8 +163,8 @@ class ProfilePage extends ConsumerWidget {
                           fontWeight: FontWeight.w600),
                     ),
                     onTap: () {
-                      // GoRouter redirect พากลับหน้า Login เองเมื่อ state เปลี่ยน
-                      context.read<AuthCubit>().logout();
+                      // GoRouter redirect พากลับหน้า Login เองเมื่อสถานะเปลี่ยน
+                      authController.logout();
                     },
                   ),
                 ),

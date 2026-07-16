@@ -2,29 +2,46 @@ import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/experimental/mutation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_header.dart';
-import '../../dashboard/logic/dashboard_providers.dart';
-import '../data/incident_repository.dart';
-import '../logic/incident_form_providers.dart';
-import '../logic/incident_mutations.dart';
+import '../../dashboard/data/models/plant.dart';
+import '../data/location_service.dart';
 
-/// แจ้งเหตุขัดข้อง (Day 5 Feature 4): Riverpod Mutation
-/// ปุ่มส่ง 4 สถานะ: idle → pending (หมุน กันกดซ้ำ) → success (เขียว) / error (แดง)
-class IncidentFormPage extends ConsumerStatefulWidget {
+/// แจ้งเหตุขัดข้อง: ฟอร์ม + รูปถ่าย + GPS ทั้งหมดเป็น state ในหน้าเดียว
+/// - รูปถ่าย: push ไปหน้า Camera แล้วรอรับ path กลับมา (context.push คืนค่าได้)
+/// - GPS: เรียก getCurrentPosition() ใน initState
+/// - ปุ่มส่ง: _submitting กันกดซ้ำ + SnackBar แจ้งผล
+class IncidentFormPage extends StatefulWidget {
   const IncidentFormPage({super.key});
 
   @override
-  ConsumerState<IncidentFormPage> createState() => _IncidentFormPageState();
+  State<IncidentFormPage> createState() => _IncidentFormPageState();
 }
 
-class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
+class _IncidentFormPageState extends State<IncidentFormPage> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+
+  // ── state ของฟอร์ม ──
+  List<Plant> _plants = [];
+  int? _selectedPlantId;
+  String _severity = 'medium';
+  String? _photoPath; // null = ยังไม่ถ่ายรูป → ปุ่มส่งกดไม่ได้
+  Position? _position; // null = กำลังหาพิกัด
+  String? _positionError;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlants();
+    _loadPosition();
+  }
 
   @override
   void dispose() {
@@ -33,59 +50,84 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
     super.dispose();
   }
 
-  void _submit(String? photoPath, double lat, double lng) {
-    final plantId = ref.read(incidentFormPlantProvider) ?? 1;
-    final severity = ref.read(incidentFormSeverityProvider);
+  Future<void> _loadPlants() async {
+    try {
+      final plants = await dashboardRepository.fetchPlants();
+      if (!mounted) return;
+      setState(() => _plants = plants);
+    } catch (_) {
+      // โหลดรายชื่อโรงไฟฟ้าไม่ได้ → dropdown ว่าง แต่ฟอร์มส่วนอื่นยังใช้ได้
+    }
+  }
 
-    submitIncidentMutation.run(ref, (tsx) async {
-      final repository = tsx.get(incidentRepositoryProvider);
-      return repository.submitIncident(
-        plantId: plantId,
+  Future<void> _loadPosition() async {
+    setState(() {
+      _position = null;
+      _positionError = null;
+    });
+    try {
+      final position = await getCurrentPosition();
+      if (!mounted) return;
+      setState(() => _position = position);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _positionError = '$e');
+    }
+  }
+
+  /// เปิดหน้ากล้อง แล้วรอรับ path ของรูปที่ถ่ายกลับมา
+  Future<void> _openCamera() async {
+    final path = await context.push<String>('/incidents/new/camera');
+    if (path != null) {
+      setState(() => _photoPath = path);
+    }
+  }
+
+  Future<void> _submit() async {
+    final photoPath = _photoPath;
+    final position = _position;
+    if (photoPath == null || position == null) return;
+
+    setState(() => _submitting = true);
+    try {
+      await incidentRepository.submitIncident(
+        plantId: _selectedPlantId ?? 1,
         title: _titleCtrl.text.trim(),
         description: _descCtrl.text.trim(),
-        severity: severity,
-        latitude: lat,
-        longitude: lng,
-        photoPath: photoPath!,
+        severity: _severity,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        photoPath: photoPath,
       );
-    });
+      if (!mounted) return;
+      // สำเร็จ: ล้างฟอร์ม + SnackBar เขียว
+      setState(() {
+        _submitting = false;
+        _photoPath = null;
+      });
+      _titleCtrl.clear();
+      _descCtrl.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${context.tr('inc_success')}'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ $e'),
+          backgroundColor: AppColors.critical,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final photoPath = ref.watch(incidentPhotoProvider);
-    final position = ref.watch(currentPositionProvider);
-    final submitState = ref.watch(submitIncidentMutation);
-    final plants = ref.watch(plantListProvider).value ?? [];
-    final selectedPlant = ref.watch(incidentFormPlantProvider);
-    final severity = ref.watch(incidentFormSeverityProvider);
-
-    // Side effect: SnackBar + ล้างฟอร์มเมื่อสำเร็จ (ref.listen ไม่ใช่ watch)
-    ref.listen(submitIncidentMutation, (previous, next) {
-      switch (next) {
-        case MutationSuccess():
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ ${context.tr('inc_success')}'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          _titleCtrl.clear();
-          _descCtrl.clear();
-          ref.read(incidentPhotoProvider.notifier).clear();
-        case MutationError(:final error):
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ $error'),
-              backgroundColor: AppColors.critical,
-            ),
-          );
-        default:
-          break;
-      }
-    });
-
-    final canSubmit = photoPath != null && position.hasValue;
+    final canSubmit = _photoPath != null && _position != null && !_submitting;
 
     return Scaffold(
       body: ListView(
@@ -103,17 +145,16 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
               children: [
                 _FieldLabel(context.tr('f_plant')),
                 DropdownButtonFormField<int>(
-                  initialValue: selectedPlant,
+                  initialValue: _selectedPlantId,
                   hint: Text(context.tr('f_plant'),
                       style: const TextStyle(fontSize: 14)),
                   items: [
-                    for (final plant in plants)
+                    for (final plant in _plants)
                       DropdownMenuItem(
                           value: plant.id, child: Text(plant.name)),
                   ],
-                  onChanged: (value) => ref
-                      .read(incidentFormPlantProvider.notifier)
-                      .select(value),
+                  onChanged: (value) =>
+                      setState(() => _selectedPlantId = value),
                 ),
                 const SizedBox(height: 14),
                 _FieldLabel(context.tr('f_title')),
@@ -150,20 +191,19 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: severity == value
+                                  color: _severity == value
                                       ? Colors.white
                                       : color,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            selected: severity == value,
+                            selected: _severity == value,
                             selectedColor: color,
                             backgroundColor: color.withValues(alpha: 0.1),
                             showCheckmark: false,
-                            onSelected: (_) => ref
-                                .read(incidentFormSeverityProvider.notifier)
-                                .select(value),
+                            onSelected: (_) =>
+                                setState(() => _severity = value),
                           ),
                         ),
                       ),
@@ -173,7 +213,7 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
                 const SizedBox(height: 14),
                 _FieldLabel(context.tr('inc_photo')),
                 InkWell(
-                  onTap: () => context.push('/incidents/new/camera'),
+                  onTap: _openCamera,
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
                     height: 140,
@@ -186,13 +226,15 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: photoPath != null
-                        ? Image.file(File(photoPath), fit: BoxFit.cover)
+                    child: _photoPath != null
+                        ? Image.file(File(_photoPath!), fit: BoxFit.cover)
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.photo_camera_outlined,
-                                  size: 28, color: AppColors.textSubtle),
+                              const HugeIcon(
+                                  icon: HugeIcons.strokeRoundedCamera01,
+                                  size: 28,
+                                  color: AppColors.textSubtle),
                               const SizedBox(height: 6),
                               Text(context.tr('inc_photo_hint'),
                                   style: const TextStyle(
@@ -211,31 +253,29 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: position.hasValue
+                      color: _position != null
                           ? AppColors.successBg
                           : AppColors.infoBg,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          position.hasValue
-                              ? Icons.location_on
-                              : Icons.location_searching,
+                        HugeIcon(
+                          icon: _position != null
+                              ? HugeIcons.strokeRoundedLocation01
+                              : HugeIcons.strokeRoundedGps01,
                           size: 20,
-                          color: position.hasValue
+                          color: _position != null
                               ? AppColors.success
                               : AppColors.info,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            position.when(
-                              data: (p) =>
-                                  '${context.tr('inc_gps')} · ${p.latitude.toStringAsFixed(4)}, ${p.longitude.toStringAsFixed(4)}',
-                              loading: () => context.tr('inc_gps_wait'),
-                              error: (e, _) => '$e',
-                            ),
+                            _positionError ??
+                                (_position != null
+                                    ? '${context.tr('inc_gps')} · ${_position!.latitude.toStringAsFixed(4)}, ${_position!.longitude.toStringAsFixed(4)}'
+                                    : context.tr('inc_gps_wait')),
                             style: const TextStyle(fontSize: 12.5),
                           ),
                         ),
@@ -244,46 +284,19 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // ปุ่มส่ง 4 สถานะจาก Mutation
-                switch (submitState) {
-                  MutationPending() => const FilledButton(
-                      onPressed: null,
-                      child: SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  MutationSuccess() => FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.success),
-                      onPressed: null,
-                      icon: const Icon(Icons.check_circle),
-                      label: Text(context.tr('inc_sent')),
-                    ),
-                  MutationError() => FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.critical),
-                      icon: const Icon(Icons.refresh),
-                      label: Text(context.tr('inc_retry')),
-                      onPressed: () => _submit(
-                        photoPath,
-                        position.requireValue.latitude,
-                        position.requireValue.longitude,
-                      ),
-                    ),
-                  _ => FilledButton.icon(
-                      icon: const Icon(Icons.send),
-                      label: Text(context.tr('inc_submit')),
-                      onPressed: canSubmit && _canValidate()
-                          ? () => _submit(
-                                photoPath,
-                                position.requireValue.latitude,
-                                position.requireValue.longitude,
-                              )
-                          : null,
-                    ),
-                },
+                // ปุ่มส่ง: หมุนระหว่างส่ง + กดไม่ได้จนกว่ารูปและพิกัดจะพร้อม
+                FilledButton.icon(
+                  icon: _submitting
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const HugeIcon(icon: HugeIcons.strokeRoundedSent),
+                  label: Text(context.tr('inc_submit')),
+                  onPressed: canSubmit ? _submit : null,
+                ),
                 const SizedBox(height: 90),
               ],
             ),
@@ -292,8 +305,6 @@ class _IncidentFormPageState extends ConsumerState<IncidentFormPage> {
       ),
     );
   }
-
-  bool _canValidate() => _titleCtrl.text.isNotEmpty || true;
 }
 
 class _FieldLabel extends StatelessWidget {

@@ -1,25 +1,28 @@
 import 'package:dio/dio.dart';
 
 import '../../features/auth/data/token_storage.dart';
-import '../../features/auth/logic/auth_cubit.dart';
+import '../../features/auth/logic/auth_controller.dart';
 
-/// แนบ Bearer Token ทุก Request + auto-refresh เมื่อเจอ 401 (retry ครั้งเดียว)
+/// แนบ Bearer Token ให้ทุก Request อัตโนมัติ
+/// และเมื่อ Server ตอบ 401 (token ใช้ไม่ได้แล้ว) → logout พากลับหน้า Login
+/// (API บน Render ไม่มี endpoint refresh token จึงไม่มีขั้นตอน retry)
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required this.tokenStorage,
-    required this.authCubit,
+    required this.authController,
     required this.dio,
   });
 
   final TokenStorage tokenStorage;
-  final AuthCubit authCubit;
+  final AuthController authController;
   final Dio dio;
 
   @override
   Future<void> onRequest(
       RequestOptions options, RequestInterceptorHandler handler) async {
     final token = await tokenStorage.readToken();
-    if (token != null && !options.path.contains('auth/login')) {
+    // หน้า login ยังไม่มี token จึงไม่ต้องแนบ
+    if (token != null && !options.path.contains('login')) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     options.headers['Accept'] = 'application/json';
@@ -29,23 +32,16 @@ class AuthInterceptor extends Interceptor {
   @override
   Future<void> onError(
       DioException err, ErrorInterceptorHandler handler) async {
-    final isRetry = err.requestOptions.extra['retried'] == true;
-    final isAuthPath = err.requestOptions.path.contains('auth/');
+    final path = err.requestOptions.path;
+    final isAuthPath = path.contains('login') || path.contains('logout');
 
-    if (err.response?.statusCode == 401 && !isRetry && !isAuthPath) {
-      final refreshed = await authCubit.refreshToken();
-      if (refreshed) {
-        final newToken = await tokenStorage.readToken();
-        final opts = err.requestOptions
-          ..headers['Authorization'] = 'Bearer $newToken'
-          ..extra['retried'] = true;
-        try {
-          final response = await dio.fetch(opts);
-          return handler.resolve(response);
-        } on DioException catch (e) {
-          return handler.next(e);
-        }
-      }
+    // 401 นอก endpoint auth = session หมดอายุ → logout
+    // (GoRouter จะ redirect กลับหน้า Login ให้เอง)
+    // เช็กสถานะก่อนกันการเรียก logout ซ้ำซ้อน
+    if (err.response?.statusCode == 401 &&
+        !isAuthPath &&
+        authController.status == AuthStatus.authenticated) {
+      await authController.logout();
     }
     handler.next(err);
   }

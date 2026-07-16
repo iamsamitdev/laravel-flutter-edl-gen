@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -27,7 +28,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(),
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft02),
+        ),
         title: Text(context.tr('fp_sub')),
       ),
       body: Center(
@@ -44,8 +48,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     color: AppColors.infoBg,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.lock_reset,
-                      size: 40, color: AppColors.info),
+                  child: const HugeIcon(
+                      icon: HugeIcons.strokeRoundedForgotPassword,
+                      size: 40,
+                      color: AppColors.info),
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -67,7 +73,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: context.tr('f_email'),
-                    prefixIcon: const Icon(Icons.mail_outline),
+                    // ครอบ Center กันไอคอนถูกยืดเต็มกรอบ 48px
+                    prefixIcon: const Center(
+                      widthFactor: 1,
+                      heightFactor: 1,
+                      child: HugeIcon(
+                          icon: HugeIcons.strokeRoundedMail01, size: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),

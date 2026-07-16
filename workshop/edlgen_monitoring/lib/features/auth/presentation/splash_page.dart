@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Splash: โลโก้กลางจอบนพื้นไล่เฉดน้ำเงิน + spinner
-/// AuthCubit.checkSession() ทำงานเบื้องหลัง → GoRouter redirect ออกเอง
+/// authController.checkSession() ทำงานเบื้องหลัง → GoRouter redirect ออกเอง
 class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
 

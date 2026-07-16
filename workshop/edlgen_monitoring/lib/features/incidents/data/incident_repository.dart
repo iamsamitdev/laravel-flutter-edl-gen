@@ -1,11 +1,7 @@
 import 'package:dio/dio.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/dio_client.dart';
 import 'models/incident.dart';
-
-part 'incident_repository.g.dart';
 
 /// ส่งเหตุขัดข้องเป็น multipart/form-data (มีไฟล์รูปแนบ)
 class IncidentRepository {
@@ -60,9 +56,4 @@ class IncidentRepository {
       throw ApiException.fromDioException(e);
     }
   }
-}
-
-@Riverpod(keepAlive: true)
-IncidentRepository incidentRepository(Ref ref) {
-  return IncidentRepository(dio: ref.watch(dioProvider));
 }

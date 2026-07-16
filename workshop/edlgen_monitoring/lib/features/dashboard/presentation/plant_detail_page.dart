@@ -1,43 +1,90 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
+import '../../../core/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/error_banner.dart';
 import '../../../core/widgets/gradient_header.dart';
 import '../../../core/widgets/stat_card.dart';
 import '../../../core/widgets/status_badge.dart';
-import '../logic/dashboard_providers.dart';
+import '../data/models/plant.dart';
 
 /// Plant detail: การ์ด output + ค่าสด + พลังงานวันนี้/ความพร้อมจ่าย + กราฟ
-class PlantDetailPage extends ConsumerWidget {
+/// โหลดข้อมูลใน initState แล้ว setState (pattern เดียวกับทุกหน้า)
+class PlantDetailPage extends StatefulWidget {
   const PlantDetailPage({super.key, required this.plantId});
 
   final int plantId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(plantDetailProvider(plantId));
+  State<PlantDetailPage> createState() => _PlantDetailPageState();
+}
 
+class _PlantDetailPageState extends State<PlantDetailPage> {
+  PlantDetail? _detail; // null = กำลังโหลด
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _detail = null;
+      _error = null;
+    });
+    try {
+      final detail =
+          await dashboardRepository.fetchPlantDetail(widget.plantId);
+      if (!mounted) return;
+      setState(() => _detail = detail);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: detail.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => SafeArea(
-          child: Column(
-            children: [
-              AppBar(leading: BackButton(onPressed: () => context.pop())),
-              ErrorBanner(
-                message: '$e',
-                retryLabel: context.tr('retry'),
-                onRetry: () => ref.invalidate(plantDetailProvider(plantId)),
+      body: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_error != null) {
+      return SafeArea(
+        child: Column(
+          children: [
+            AppBar(
+              leading: IconButton(
+                onPressed: () => context.pop(),
+                icon:
+                    const HugeIcon(icon: HugeIcons.strokeRoundedArrowLeft02),
               ),
-            ],
-          ),
+            ),
+            ErrorBanner(
+              message: _error!,
+              retryLabel: context.tr('retry'),
+              onRetry: _load,
+            ),
+          ],
         ),
-        data: (d) => ListView(
+      );
+    }
+
+    final d = _detail;
+    if (d == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
           padding: EdgeInsets.zero,
           children: [
             GradientHeader(
@@ -87,24 +134,24 @@ class PlantDetailPage extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: SizedBox(
-                          height: 110,
+                          height: 120,
                           child: StatCard(
                             title: context.tr('pd_energy_today'),
                             value: d.energyTodayMwh.toStringAsFixed(0),
                             unit: 'MWh',
-                            icon: Icons.battery_charging_full,
+                            icon: HugeIcons.strokeRoundedBatteryCharging01,
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: SizedBox(
-                          height: 110,
+                          height: 120,
                           child: StatCard(
                             title: context.tr('pd_uptime'),
                             value: d.plant.loadFactor.toStringAsFixed(0),
                             unit: '%',
-                            icon: Icons.check_circle_outline,
+                            icon: HugeIcons.strokeRoundedCheckmarkCircle02,
                             color: AppColors.success,
                           ),
                         ),
@@ -116,24 +163,24 @@ class PlantDetailPage extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: SizedBox(
-                          height: 110,
+                          height: 120,
                           child: StatCard(
                             title: context.tr('dash_freq'),
                             value: d.frequencyHz.toStringAsFixed(2),
                             unit: 'Hz',
-                            icon: Icons.speed,
+                            icon: HugeIcons.strokeRoundedDashboardSpeed01,
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: SizedBox(
-                          height: 110,
+                          height: 120,
                           child: StatCard(
                             title: context.tr('dash_volt'),
                             value: d.voltageKv.toStringAsFixed(1),
                             unit: 'kV',
-                            icon: Icons.electrical_services,
+                            icon: HugeIcons.strokeRoundedPlug01,
                             color: AppColors.goldDark,
                           ),
                         ),
@@ -199,9 +246,7 @@ class PlantDetailPage extends ConsumerWidget {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

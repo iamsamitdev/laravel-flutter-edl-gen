@@ -1,19 +1,26 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hugeicons/hugeicons.dart';
 
-import '../logic/report_providers.dart';
+/// ค่าที่หน้านี้ส่งกลับให้หน้า Reports ผ่าน context.pop(DateRange(...))
+class DateRange {
+  const DateRange({required this.from, required this.to});
+
+  final String from; // 'YYYY-MM-DD'
+  final String to;
+}
 
 /// Date range picker: ช่วงด่วน (7/30 วัน, เดือนนี้) + From/To + ปุ่ม Apply
-class DateRangePage extends ConsumerStatefulWidget {
+/// กด Apply → pop กลับพร้อมค่า DateRange (ไม่มี state ส่วนกลางใด ๆ)
+class DateRangePage extends StatefulWidget {
   const DateRangePage({super.key});
 
   @override
-  ConsumerState<DateRangePage> createState() => _DateRangePageState();
+  State<DateRangePage> createState() => _DateRangePageState();
 }
 
-class _DateRangePageState extends ConsumerState<DateRangePage> {
+class _DateRangePageState extends State<DateRangePage> {
   DateTime _from = DateTime.now().subtract(const Duration(days: 7));
   DateTime _to = DateTime.now();
 
@@ -92,11 +99,11 @@ class _DateRangePageState extends ConsumerState<DateRangePage> {
             const Spacer(),
             FilledButton(
               onPressed: () {
-                ref.read(reportFilterStateProvider.notifier).setDateRange(
-                      _fmt.format(_from),
-                      _fmt.format(_to),
-                    );
-                context.pop();
+                // ส่งช่วงวันที่กลับให้หน้า Reports
+                context.pop(DateRange(
+                  from: _fmt.format(_from),
+                  to: _fmt.format(_to),
+                ));
               },
               child: Text(context.tr('dr_apply')),
             ),
@@ -133,7 +140,8 @@ class _DateField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16),
+                const HugeIcon(
+                    icon: HugeIcons.strokeRoundedCalendar04, size: 16),
                 const SizedBox(width: 8),
                 Text(value, style: const TextStyle(fontSize: 14)),
               ],

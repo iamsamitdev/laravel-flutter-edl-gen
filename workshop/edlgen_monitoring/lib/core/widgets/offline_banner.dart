@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import '../theme/app_colors.dart';
 
@@ -22,7 +23,10 @@ class OfflineBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off, size: 20, color: Color(0xFF7A5800)),
+          const HugeIcon(
+              icon: HugeIcons.strokeRoundedWifiDisconnected01,
+              size: 20,
+              color: Color(0xFF7A5800)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
