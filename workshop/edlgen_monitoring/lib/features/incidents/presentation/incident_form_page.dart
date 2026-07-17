@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -11,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_header.dart';
 import '../../dashboard/data/models/plant.dart';
 import '../data/location_service.dart';
+import 'models/captured_photo.dart';
 
 /// แจ้งเหตุขัดข้อง: ฟอร์ม + รูปถ่าย + GPS ทั้งหมดเป็น state ในหน้าเดียว
 /// - รูปถ่าย: push ไปหน้า Camera แล้วรอรับ path กลับมา (context.push คืนค่าได้)
@@ -31,7 +30,7 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
   List<Plant> _plants = [];
   int? _selectedPlantId;
   String _severity = 'medium';
-  String? _photoPath; // null = ยังไม่ถ่ายรูป → ปุ่มส่งกดไม่ได้
+  CapturedPhoto? _photo; // null = ยังไม่ถ่ายรูป → ปุ่มส่งกดไม่ได้
   Position? _position; // null = กำลังหาพิกัด
   String? _positionError;
   bool _submitting = false;
@@ -75,18 +74,18 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
     }
   }
 
-  /// เปิดหน้ากล้อง แล้วรอรับ path ของรูปที่ถ่ายกลับมา
+  /// เปิดหน้ากล้อง แล้วรอรับรูป (bytes) ที่ถ่ายกลับมา
   Future<void> _openCamera() async {
-    final path = await context.push<String>('/incidents/new/camera');
-    if (path != null) {
-      setState(() => _photoPath = path);
+    final photo = await context.push<CapturedPhoto>('/incidents/new/camera');
+    if (photo != null) {
+      setState(() => _photo = photo);
     }
   }
 
   Future<void> _submit() async {
-    final photoPath = _photoPath;
+    final photo = _photo;
     final position = _position;
-    if (photoPath == null || position == null) return;
+    if (photo == null || position == null) return;
 
     setState(() => _submitting = true);
     try {
@@ -97,13 +96,14 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
         severity: _severity,
         latitude: position.latitude,
         longitude: position.longitude,
-        photoPath: photoPath,
+        photoBytes: photo.bytes,
+        photoName: photo.name,
       );
       if (!mounted) return;
       // สำเร็จ: ล้างฟอร์ม + SnackBar เขียว
       setState(() {
         _submitting = false;
-        _photoPath = null;
+        _photo = null;
       });
       _titleCtrl.clear();
       _descCtrl.clear();
@@ -117,17 +117,14 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
       if (!mounted) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ $e'),
-          backgroundColor: AppColors.critical,
-        ),
+        SnackBar(content: Text('❌ $e'), backgroundColor: AppColors.critical),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final canSubmit = _photoPath != null && _position != null && !_submitting;
+    final canSubmit = _photo != null && _position != null && !_submitting;
 
     return Scaffold(
       body: ListView(
@@ -146,12 +143,16 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                 _FieldLabel(context.tr('f_plant')),
                 DropdownButtonFormField<int>(
                   initialValue: _selectedPlantId,
-                  hint: Text(context.tr('f_plant'),
-                      style: const TextStyle(fontSize: 14)),
+                  hint: Text(
+                    context.tr('f_plant'),
+                    style: const TextStyle(fontSize: 14),
+                  ),
                   items: [
                     for (final plant in _plants)
                       DropdownMenuItem(
-                          value: plant.id, child: Text(plant.name)),
+                        value: plant.id,
+                        child: Text(plant.name),
+                      ),
                   ],
                   onChanged: (value) =>
                       setState(() => _selectedPlantId = value),
@@ -160,8 +161,7 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                 _FieldLabel(context.tr('f_title')),
                 TextField(
                   controller: _titleCtrl,
-                  decoration:
-                      const InputDecoration(hintText: 'Turbine #2 ...'),
+                  decoration: const InputDecoration(hintText: 'Turbine #2 ...'),
                 ),
                 const SizedBox(height: 14),
                 _FieldLabel(context.tr('f_desc')),
@@ -216,7 +216,7 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                   onTap: _openCamera,
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    height: 140,
+                    height: _photo != null ? 220 : 140,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
@@ -226,20 +226,24 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: _photoPath != null
-                        ? Image.file(File(_photoPath!), fit: BoxFit.cover)
+                    child: _photo != null
+                        ? Image.memory(_photo!.bytes, fit: BoxFit.cover)
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const HugeIcon(
-                                  icon: HugeIcons.strokeRoundedCamera01,
-                                  size: 28,
-                                  color: AppColors.textSubtle),
+                                icon: HugeIcons.strokeRoundedCamera01,
+                                size: 28,
+                                color: AppColors.textSubtle,
+                              ),
                               const SizedBox(height: 6),
-                              Text(context.tr('inc_photo_hint'),
-                                  style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: AppColors.textSubtle)),
+                              Text(
+                                context.tr('inc_photo_hint'),
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.textSubtle,
+                                ),
+                              ),
                             ],
                           ),
                   ),
@@ -251,7 +255,9 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: _position != null
                           ? AppColors.successBg
@@ -291,7 +297,9 @@ class _IncidentFormPageState extends State<IncidentFormPage> {
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const HugeIcon(icon: HugeIcons.strokeRoundedSent),
                   label: Text(context.tr('inc_submit')),
@@ -316,8 +324,10 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(text,
-          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
