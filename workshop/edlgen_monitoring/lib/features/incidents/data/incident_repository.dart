@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -16,7 +18,8 @@ class IncidentRepository {
     required String severity, // low | medium | high | critical
     required double latitude,
     required double longitude,
-    required String photoPath,
+    required Uint8List photoBytes,
+    String photoName = 'incident.jpg',
   }) async {
     try {
       final formData = FormData.fromMap({
@@ -26,8 +29,8 @@ class IncidentRepository {
         'severity': severity,
         'latitude': latitude,
         'longitude': longitude,
-        'photo':
-            await MultipartFile.fromFile(photoPath, filename: 'incident.jpg'),
+        // ใช้ fromBytes (ไม่ใช่ fromFile) เพราะ dart:io File ใช้บน Flutter Web ไม่ได้
+        'photo': MultipartFile.fromBytes(photoBytes, filename: photoName),
       });
 
       final response = await dio.post('incidents', data: formData);
