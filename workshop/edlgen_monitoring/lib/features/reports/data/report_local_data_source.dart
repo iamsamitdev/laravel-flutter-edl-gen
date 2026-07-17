@@ -1,50 +1,33 @@
 import 'dart:convert';
 
-import 'package:path/path.dart' as p;
-import 'package:sqflite/sqflite.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/daily_report.dart';
 
-/// Cache ฝั่งเครื่องด้วย sqflite (Day 5 Feature 3)
-/// เก็บ payload เป็น JSON ต่อแถว + คอลัมน์ที่ใช้ query (report_date, plant_id)
+/// Cache ฝั่งเครื่องด้วย SharedPreferences (Day 5 Feature 3)
+/// เก็บ report ทั้งหมดเป็น JSON list เดียวใน key เดียว
+/// (เปลี่ยนจาก sqflite → SharedPreferences เพราะ sqflite ไม่รองรับ Flutter Web
+/// ทำให้หน้า Reports พังตอนรันบน website)
 class ReportLocalDataSource {
-  Database? _db;
-
-  Future<Database> _open() async {
-    if (_db != null) return _db!;
-    _db = await openDatabase(
-      p.join(await getDatabasesPath(), 'edlgen_cache.db'),
-      version: 1,
-      onCreate: (db, _) => db.execute('''
-        CREATE TABLE daily_reports (
-          id INTEGER PRIMARY KEY,
-          plant_id INTEGER NOT NULL,
-          report_date TEXT NOT NULL,
-          payload TEXT NOT NULL,
-          cached_at TEXT NOT NULL
-        )
-      '''),
-    );
-    return _db!;
-  }
+  static const _cacheKey = 'edlgen_reports_cache';
 
   Future<void> saveReports(List<DailyReport> reports) async {
-    final db = await _open();
-    final batch = db.batch();
+    final prefs = await SharedPreferences.getInstance();
+    final existing = await _readAll(prefs);
+
+    // แทนที่รายการเดิมที่ id ตรงกัน ที่เหลือเก็บไว้เหมือนเดิม
+    final byId = {for (final r in existing) r.id: r};
     for (final r in reports) {
-      batch.insert(
-        'daily_reports',
-        {
-          'id': r.id,
-          'plant_id': r.plantId,
-          'report_date': r.reportDate,
-          'payload': jsonEncode(r.toJson()),
-          'cached_at': DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      byId[r.id] = r;
     }
-    await batch.commit(noResult: true);
+
+    final merged = byId.values.toList()
+      ..sort((a, b) => b.reportDate.compareTo(a.reportDate));
+
+    await prefs.setString(
+      _cacheKey,
+      jsonEncode(merged.map((r) => r.toJson()).toList()),
+    );
   }
 
   Future<List<DailyReport>> loadReports({
@@ -52,33 +35,25 @@ class ReportLocalDataSource {
     String? dateTo,
     int? plantId,
   }) async {
-    final db = await _open();
-    final where = <String>[];
-    final args = <Object>[];
+    final prefs = await SharedPreferences.getInstance();
+    final all = await _readAll(prefs);
 
-    if (dateFrom != null) {
-      where.add('report_date >= ?');
-      args.add(dateFrom);
-    }
-    if (dateTo != null) {
-      where.add('report_date <= ?');
-      args.add(dateTo);
-    }
-    if (plantId != null) {
-      where.add('plant_id = ?');
-      args.add(plantId);
-    }
+    return all.where((r) {
+      if (dateFrom != null && r.reportDate.compareTo(dateFrom) < 0) {
+        return false;
+      }
+      if (dateTo != null && r.reportDate.compareTo(dateTo) > 0) return false;
+      if (plantId != null && r.plantId != plantId) return false;
+      return true;
+    }).toList();
+  }
 
-    final rows = await db.query(
-      'daily_reports',
-      where: where.isEmpty ? null : where.join(' AND '),
-      whereArgs: args.isEmpty ? null : args,
-      orderBy: 'report_date DESC',
-    );
-
-    return rows
-        .map((row) => DailyReport.fromJson(
-            jsonDecode(row['payload'] as String) as Map<String, dynamic>))
+  Future<List<DailyReport>> _readAll(SharedPreferences prefs) async {
+    final raw = prefs.getString(_cacheKey);
+    if (raw == null || raw.isEmpty) return [];
+    final list = jsonDecode(raw) as List;
+    return list
+        .map((json) => DailyReport.fromJson(json as Map<String, dynamic>))
         .toList();
   }
 }
