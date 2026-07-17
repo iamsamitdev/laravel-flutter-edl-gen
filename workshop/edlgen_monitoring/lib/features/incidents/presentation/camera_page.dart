@@ -5,9 +5,11 @@ import 'package:hugeicons/hugeicons.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
+import 'models/captured_photo.dart';
 
 /// Camera: วิวไฟน์เดอร์ + กรอบมุม + ปุ่มชัตเตอร์/คลังรูป
-/// ถ่ายรูปด้วย image_picker แล้ว "ส่ง path กลับ" ให้หน้าฟอร์มผ่าน context.pop(path)
+/// ถ่ายรูปด้วย image_picker แล้ว "ส่ง bytes กลับ" ให้หน้าฟอร์มผ่าน context.pop(...)
+/// ใช้ bytes แทน path เพราะ dart:io File ใช้บน Flutter Web ไม่ได้
 class CameraPage extends StatelessWidget {
   const CameraPage({super.key});
 
@@ -17,8 +19,10 @@ class CameraPage extends StatelessWidget {
       maxWidth: 1600,
       imageQuality: 80, // ย่อรูปก่อนอัปโหลด กันไฟล์เกิน 5 MB
     );
-    if (context.mounted && picked != null) {
-      context.pop(picked.path); // ได้รูปแล้วส่ง path กลับไปหน้าฟอร์ม
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (context.mounted) {
+      context.pop(CapturedPhoto(bytes: bytes, name: picked.name));
     }
   }
 
@@ -36,15 +40,18 @@ class CameraPage extends StatelessWidget {
                   IconButton(
                     onPressed: () => context.pop(),
                     icon: const HugeIcon(
-                        icon: HugeIcons.strokeRoundedCancel01,
-                        color: Colors.white),
+                      icon: HugeIcons.strokeRoundedCancel01,
+                      color: Colors.white,
+                    ),
                   ),
                   Expanded(
                     child: Text(
                       context.tr('cam_title'),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w600),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 48),
@@ -70,14 +77,17 @@ class CameraPage extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const HugeIcon(
-                                  icon: HugeIcons.strokeRoundedCamera01,
-                                  size: 44,
-                                  color: Colors.white38),
+                                icon: HugeIcons.strokeRoundedCamera01,
+                                size: 44,
+                                color: Colors.white38,
+                              ),
                               const SizedBox(height: 10),
                               Text(
                                 context.tr('cam_hint'),
                                 style: const TextStyle(
-                                    color: Colors.white54, fontSize: 12.5),
+                                  color: Colors.white54,
+                                  fontSize: 12.5,
+                                ),
                               ),
                             ],
                           ),
@@ -99,19 +109,27 @@ class CameraPage extends StatelessWidget {
                                 border: Border(
                                   top: alignment.y < 0
                                       ? const BorderSide(
-                                          color: AppColors.gold, width: 3)
+                                          color: AppColors.gold,
+                                          width: 3,
+                                        )
                                       : BorderSide.none,
                                   bottom: alignment.y > 0
                                       ? const BorderSide(
-                                          color: AppColors.gold, width: 3)
+                                          color: AppColors.gold,
+                                          width: 3,
+                                        )
                                       : BorderSide.none,
                                   left: alignment.x < 0
                                       ? const BorderSide(
-                                          color: AppColors.gold, width: 3)
+                                          color: AppColors.gold,
+                                          width: 3,
+                                        )
                                       : BorderSide.none,
                                   right: alignment.x > 0
                                       ? const BorderSide(
-                                          color: AppColors.gold, width: 3)
+                                          color: AppColors.gold,
+                                          width: 3,
+                                        )
                                       : BorderSide.none,
                                 ),
                               ),
@@ -132,16 +150,20 @@ class CameraPage extends StatelessWidget {
                   Column(
                     children: [
                       IconButton(
-                        onPressed: () =>
-                            _capture(context, gallery: true),
+                        onPressed: () => _capture(context, gallery: true),
                         icon: const HugeIcon(
-                            icon: HugeIcons.strokeRoundedAlbum02,
-                            color: Colors.white,
-                            size: 30),
+                          icon: HugeIcons.strokeRoundedAlbum02,
+                          color: Colors.white,
+                          size: 30,
+                        ),
                       ),
-                      Text(context.tr('cam_gallery'),
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 11)),
+                      Text(
+                        context.tr('cam_gallery'),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                   GestureDetector(
